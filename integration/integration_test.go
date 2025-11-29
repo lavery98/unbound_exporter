@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 )
 
 // TestIntegration checks that unbound_exporter is running, successfully
@@ -31,7 +32,7 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("Expected a 200 OK from unbound_exporter, got: %v", resp.StatusCode)
 	}
 
-	parser := expfmt.TextParser{}
+	parser := expfmt.NewTextParser(model.UTF8Validation)
 	metrics, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil {
 		t.Fatalf("Failed to parse metrics from unbound_exporter: %v", err)
@@ -46,14 +47,27 @@ func TestIntegration(t *testing.T) {
 	// Check some expected metrics are present
 	for _, metric := range []string{
 		"go_info",
+		"unbound_exporter_build_info",
 		"unbound_queries_total",
 		"unbound_response_time_seconds",
 		"unbound_cache_hits_total",
 		"unbound_query_https_total",
 		"unbound_memory_doh_bytes",
+		"unbound_query_subnet_total",
+		"unbound_query_subnet_cache_total",
 	} {
 		if _, ok := metrics[metric]; !ok {
 			t.Errorf("Expected metric is missing: %s", metric)
 		}
 	}
+
+	resp, err = http.Get("http://localhost:9167/_healthz")
+	if err != nil {
+		t.Fatalf("Failed to fetch healthz from unbound_exporter: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unbound_exporter reported unhealthy, status code: %d", resp.StatusCode)
+	}
+
 }
